@@ -1,0 +1,99 @@
+:root {
+  color: #1c2430;
+  background: #f4f6f8;
+  font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+}
+
+#app {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+h1, h2, h3 { margin: 0; font-weight: 600; }
+h1 { font-size: 20px; }
+h2 { font-size: 16px; margin-bottom: 8px; }
+h3 { font-size: 13px; margin: 12px 0 4px; }
+
+.header { margin-bottom: 12px; }
+.hub { margin: 2px 0 0; color: #5c6b7a; }
+
+.banner {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #e7eef6;
+}
+.banner.ok { background: #e5f4ec; }
+.banner.error { background: #fde8e8; color: #8d1d1d; }
+
+.tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.tab, button {
+  border: 1px solid #c5d0dc;
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.tab.active { background: #0f6b4c; color: #fff; border-color: #0f6b4c; }
+button.primary { background: #0f6b4c; color: #fff; border-color: #0f6b4c; }
+button:disabled { opacity: 0.6; cursor: default; }
+
+.filters, .toolbar, .pager { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.filters input, .field input {
+  border: 1px solid #c5d0dc;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: #fff;
+}
+.filters input[name="query"] { flex: 1; }
+.filters input[name="schema"] { width: 280px; }
+
+table { width: 100%; border-collapse: collapse; background: #fff; }
+th, td { text-align: left; padding: 8px; border-bottom: 1px solid #e4e9ef; vertical-align: top; }
+.schema { display: block; color: #5c6b7a; font-size: 12px; word-break: break-all; }
+
+.note, .empty, .status, .meta { color: #5c6b7a; }
+.error-text { color: #8d1d1d; }
+
+.submit, .request {
+  background: #fff;
+  border: 1px solid #e4e9ef;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 12px;
+}
+
+fieldset { border: 0; padding: 0; margin: 0 0 12px; }
+legend { font-weight: 600; margin-bottom: 6px; }
+.locales { display: flex; flex-wrap: wrap; gap: 6px 12px; max-height: 140px; overflow: auto; }
+.choice { display: block; margin: 4px 0; }
+.field { display: flex; flex-direction: column; gap: 4px; max-width: 220px; margin-bottom: 12px; }
+
+.request-title {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+.pill {
+  border-radius: 99px;
+  padding: 2px 8px;
+  font-size: 12px;
+  background: #e7eef6;
+}
+.pill.complete { background: #e5f4ec; }
+.pill.failed { background: #fde8e8; color: #8d1d1d; }
+.pill.in-review { background: #fff4d6; }
+.detail ul { margin: 0; padding-left: 18px; }
