@@ -145,6 +145,13 @@ test("refresh keeps the local request and applies the Pantheon status", () => {
   );
   assert.equal(merged[0].status, "in-review");
   assert.equal(merged[0].review, "xtm");
-  assert.equal(submission.reviewLabel("xtm"), "Review in XTM");
+  assert.equal(submission.reviewLabel("xtm"), "Human review requested");
   assert.equal(submission.reviewLabel("none"), "No human review");
+});
+
+test("language search matches the name or the code", () => {
+  const matches = submission.filterLocales(["de-DE", "fr-FR", "sv-SE"], "german");
+  assert.deepEqual(matches, ["de-DE"]);
+  assert.equal(submission.localeLabel("fr-FR"), "French (France) (fr-FR)");
+  assert.equal(submission.contentTypeLabel("https://www.epson.com/hero.json"), "Hero");
 });

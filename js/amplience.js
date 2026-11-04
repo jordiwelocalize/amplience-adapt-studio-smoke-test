@@ -81,10 +81,10 @@
       data = null;
     }
     if (!response.ok) {
-      throw new Error(extractError(data) || "Pantheon did not accept the request.");
+      throw new Error(extractError(data) || "The translation request could not be sent.");
     }
     if (!data || !data.projectId) {
-      throw new Error("Pantheon did not return a project id.");
+      throw new Error("The translation request could not be confirmed.");
     }
     return data;
   }

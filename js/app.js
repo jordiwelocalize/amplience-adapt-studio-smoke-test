@@ -17,6 +17,10 @@
     openRequestId: null,
     text: "",
     schema: "",
+    chosenLocales: {},
+    localeFilter: "",
+    dueDate: "",
+    humanReview: false,
     message: "",
     messageTone: "",
     busy: false,
@@ -27,6 +31,27 @@
     if (className) node.className = className;
     if (text != null) node.textContent = text;
     return node;
+  }
+
+  function brandMark() {
+    var brand = el("div", "brand");
+    var logo = document.createElement("img");
+    logo.className = "logo";
+    logo.src = "assets/welocalize-logo.svg";
+    logo.alt = "Welocalize";
+    brand.appendChild(logo);
+    brand.appendChild(el("p", "product", "Translation"));
+    return brand;
+  }
+
+  function pageHeader(hubName) {
+    var header = el("header", "header");
+    var row = el("div", "header-row");
+    row.appendChild(brandMark());
+    if (hubName) row.appendChild(el("p", "hub", hubName));
+    header.appendChild(row);
+    header.appendChild(el("div", "accent"));
+    return header;
   }
 
   function today() {
@@ -55,13 +80,57 @@
     localStorage.setItem(submission.storageKey(state.hubId), JSON.stringify(state.requests));
   }
 
+  function previewItems() {
+    return [
+      {
+        id: "item-1",
+        label: "Hero banner",
+        locale: "en",
+        schema: "https://www.epson.com/hero.json",
+        lastModifiedDate: "2026-11-01T00:00:00.000Z",
+      },
+      {
+        id: "item-2",
+        label: "Homepage intro",
+        locale: "en",
+        schema: "https://www.epson.com/text.json",
+        lastModifiedDate: "2026-10-28T00:00:00.000Z",
+      },
+      {
+        id: "item-3",
+        label: "Printer comparison",
+        locale: "en",
+        schema: "https://www.epson.com/text.json",
+        lastModifiedDate: "2026-10-20T00:00:00.000Z",
+      },
+      {
+        id: "item-4",
+        label: "EcoTank offer",
+        locale: "en",
+        schema: "https://www.epson.com/hero.json",
+        lastModifiedDate: "2026-10-12T00:00:00.000Z",
+      },
+      {
+        id: "item-5",
+        label: "Support accordion",
+        locale: "en",
+        schema: "https://www.epson.com/accordion.json",
+        lastModifiedDate: "2026-09-30T00:00:00.000Z",
+      },
+    ];
+  }
+
   function previewSdk() {
     return {
       hub: { id: "preview-hub", name: "Preview hub" },
       params: {
         installation: {
           sourceLocale: "en",
-          targetLocales: ["de-DE", "fr-FR"],
+          contentTypeUris: [
+            "https://www.epson.com/hero.json",
+            "https://www.epson.com/text.json",
+            "https://www.epson.com/accordion.json",
+          ],
           submissionUrl: "",
         },
       },
@@ -82,42 +151,57 @@
             };
           }
           if (url.indexOf("/facet") !== -1) {
+            var items = previewItems().filter(function (item) {
+              var body = config.data || {};
+              var schemaField = (body.fields || []).filter(function (field) {
+                return field.field === "schema" && field.filter && field.filter.values;
+              })[0];
+              if (!schemaField) return true;
+              return schemaField.filter.values.indexOf(item.schema) !== -1;
+            });
+            var queryText = "";
+            var queryMatch = url.match(/[?&]query=([^&]+)/);
+            if (queryMatch) queryText = decodeURIComponent(queryMatch[1]);
+            var textMatch = queryText.match(/ AND "([^"]+)"\s*$/);
+            if (textMatch) {
+              var needle = textMatch[1].toLowerCase();
+              items = items.filter(function (item) {
+                return (item.label || "").toLowerCase().indexOf(needle) !== -1;
+              });
+            }
             return {
               status: 200,
               data: {
-                _embedded: {
-                  "content-items": [
-                    {
-                      id: "item-1",
-                      label: "Hero banner",
-                      locale: "en",
-                      schema: "https://example.com/hero.json",
-                      lastModifiedDate: "2026-11-01T00:00:00.000Z",
-                    },
-                  ],
-                },
-                page: { number: 0, totalPages: 1, totalElements: 1 },
+                _embedded: { "content-items": items },
+                page: { number: 0, totalPages: 1, totalElements: items.length },
               },
             };
           }
-          if (config.method === "GET" && url.indexOf("content-items/item-1") !== -1) {
-            return {
-              status: 200,
-              data: {
-                id: "item-1",
-                label: "Hero banner",
-                locale: "en",
-                version: 4,
-                body: {
-                  _meta: {
-                    name: "Hero banner",
-                    schema: "https://example.com/hero.json",
-                    deliveryKey: "hero",
+          var itemMatch = url.match(/content-items\/(item-\d+)/);
+          if (config.method === "GET" && itemMatch) {
+            var found = previewItems().filter(function (item) {
+              return item.id === itemMatch[1];
+            })[0];
+            if (found) {
+              return {
+                status: 200,
+                data: {
+                  id: found.id,
+                  label: found.label,
+                  locale: found.locale,
+                  version: 4,
+                  schema: found.schema,
+                  body: {
+                    _meta: {
+                      name: found.label,
+                      schema: found.schema,
+                      deliveryKey: found.id,
+                    },
+                    title: found.label,
                   },
-                  title: "Hello",
                 },
-              },
-            };
+              };
+            }
           }
           return { status: 200, data: {} };
         },
@@ -162,7 +246,7 @@
   function renderDisconnected() {
     var root = document.getElementById("app");
     root.textContent = "";
-    root.appendChild(el("h1", null, "Welocalize translation"));
+    root.appendChild(pageHeader());
     root.appendChild(
       el("p", "status", "Not connected. Open this page from the Amplience dashboard tab.")
     );
@@ -220,25 +304,41 @@
     });
   }
 
-  function selectedLocales(form) {
-    return Array.prototype.filter
-      .call(form.querySelectorAll('input[name="locale"]:checked'), function (input) {
-        return input.value;
-      })
-      .map(function (input) {
-        return input.value;
-      });
+  function chosenLocaleList() {
+    return state.settings.targetLocales.filter(function (code) {
+      return state.chosenLocales[code];
+    });
+  }
+
+  function selectionSummaryText() {
+    var items = Object.keys(state.selected).length;
+    var locales = chosenLocaleList().length;
+    return (
+      items +
+      (items === 1 ? " content item" : " content items") +
+      " · " +
+      locales +
+      (locales === 1 ? " language" : " languages")
+    );
+  }
+
+  function paintSelectionSummary() {
+    var node = document.querySelector("[data-selection-summary]");
+    if (!node) return;
+    node.textContent = selectionSummaryText();
   }
 
   async function onSubmit(event) {
     event.preventDefault();
     var form = event.target;
-    var review = form.querySelector('input[name="review"]:checked');
+    var humanReview = form.querySelector('input[name="humanReview"]');
+    state.dueDate = form.dueDate.value;
+    state.humanReview = Boolean(humanReview && humanReview.checked);
     var input = {
       items: selectedItems(),
-      targetLocales: selectedLocales(form),
-      review: review ? review.value : "",
-      dueDate: form.dueDate.value,
+      targetLocales: chosenLocaleList(),
+      review: state.humanReview ? "xtm" : "none",
+      dueDate: state.dueDate,
     };
     var errors = submission.validateSubmission(
       {
@@ -256,6 +356,7 @@
     }
 
     state.busy = true;
+    state.submitting = true;
     showMessage("Submitting…", "");
     render();
 
@@ -303,13 +404,11 @@
             }
           }
         } else {
-          warnings.push("No In progress workflow state is configured, so the source items were left unchanged.");
+          warnings.push("The content status in Amplience was left unchanged.");
         }
       } else {
         errorText = null;
-        warnings.push(
-          "Held in this browser. A Pantheon project is created when the handoff URL is set on the extension."
-        );
+        warnings.push("Saved on this computer. Welocalize has not received this request yet.");
       }
 
       var record = submission.createLocalRequest({
@@ -332,7 +431,7 @@
       state.tab = "requests";
       state.openRequestId = record.id;
       showMessage(
-        handoff === "pantheon" ? "Translation request created." : "Request saved in this browser.",
+        handoff === "pantheon" ? "Translation request sent." : "Request saved on this computer.",
         "ok"
       );
     } catch (error) {
@@ -369,13 +468,14 @@
       showMessage(failed.error, "error");
     } finally {
       state.busy = false;
+      state.submitting = false;
       render();
     }
   }
 
   async function refreshStatus() {
     if (!state.settings.submissionUrl) {
-      showMessage("Status is stored in this browser until a handoff URL is set.", "");
+      showMessage("Status is kept on this computer until requests can be sent.", "");
       render();
       return;
     }
@@ -400,10 +500,7 @@
     var scrollTop = scroll ? scroll.scrollTop : 0;
     root.textContent = "";
 
-    var header = el("header", "header");
-    header.appendChild(el("h1", null, "Welocalize translation"));
-    header.appendChild(el("p", "hub", state.hubName));
-    root.appendChild(header);
+    root.appendChild(pageHeader(state.hubName));
 
     if (state.message) {
       root.appendChild(el("p", "banner " + (state.messageTone || "info"), state.message));
@@ -434,52 +531,100 @@
   }
 
   function renderContent(content) {
+    var workspace = el("div", "workspace");
+    var finder = el("section", "finder");
+    finder.appendChild(el("h2", null, "Find content"));
+    finder.appendChild(
+      el(
+        "p",
+        "note",
+        submission.localeLabel(state.settings.sourceLocale) +
+          (state.readyStateId
+            ? " content that is ready to translate."
+            : " content in this hub.")
+      )
+    );
+
     var filters = el("form", "filters");
     filters.addEventListener("submit", function (event) {
       event.preventDefault();
       state.text = filters.query.value;
-      state.schema = filters.schema.value.trim();
       state.page = { number: 0, totalPages: 1, totalElements: 0 };
       loadContent();
     });
+    var searchLabel = el("label", "field grow");
+    searchLabel.appendChild(document.createTextNode("Search by name"));
     var search = el("input");
     search.name = "query";
     search.type = "search";
-    search.placeholder = "Search content";
+    search.placeholder = "Banner, page title, campaign";
     search.value = state.text;
-    filters.appendChild(search);
-    var schema = el("input");
-    schema.name = "schema";
-    schema.type = "text";
-    schema.placeholder = "Content type URL";
-    schema.value = state.schema;
-    filters.appendChild(schema);
+    searchLabel.appendChild(search);
+    filters.appendChild(searchLabel);
+    if (state.settings.contentTypeUris.length) {
+      var typeLabel = el("label", "field");
+      typeLabel.appendChild(document.createTextNode("Content type"));
+      var select = el("select");
+      select.name = "contentType";
+      var allTypes = el("option", null, "All content types");
+      allTypes.value = "";
+      select.appendChild(allTypes);
+      state.settings.contentTypeUris.forEach(function (uri) {
+        var option = el("option", null, submission.contentTypeLabel(uri));
+        option.value = uri;
+        select.appendChild(option);
+      });
+      select.value = state.schema;
+      select.addEventListener("change", function () {
+        state.schema = select.value;
+        state.page = { number: 0, totalPages: 1, totalElements: 0 };
+        loadContent();
+      });
+      typeLabel.appendChild(select);
+      filters.appendChild(typeLabel);
+    }
     var searchButton = el("button", null, "Search");
     searchButton.type = "submit";
     searchButton.disabled = state.busy;
     filters.appendChild(searchButton);
-    content.appendChild(filters);
-
-    var note = el(
-      "p",
-      "note",
-      "Source locale " +
-        state.settings.sourceLocale +
-        ". " +
-        (state.readyStateId
-          ? "Showing items in the Ready workflow state."
-          : "No Ready workflow state is configured, so every active item in the source locale is listed.")
-    );
-    content.appendChild(note);
+    finder.appendChild(filters);
 
     if (!state.items.length) {
-      content.appendChild(el("p", "empty", state.busy ? "Loading content…" : "No content items match."));
+      finder.appendChild(el("p", "empty", state.busy ? "Loading content…" : "No content items match."));
     } else {
       var table = el("table");
       var head = el("tr");
-      head.appendChild(el("th", null, ""));
+      var selectHead = el("th");
+      var selectAll = el("input");
+      selectAll.type = "checkbox";
+      selectAll.setAttribute("aria-label", "Select all on this page");
+      var pageIds = state.items.map(function (item) {
+        return item.id;
+      });
+      var selectedOnPage = pageIds.filter(function (id) {
+        return state.selected[id];
+      }).length;
+      selectAll.checked = pageIds.length > 0 && selectedOnPage === pageIds.length;
+      selectAll.indeterminate = selectedOnPage > 0 && selectedOnPage < pageIds.length;
+      selectAll.addEventListener("change", function () {
+        state.items.forEach(function (item) {
+          if (selectAll.checked) {
+            state.selected[item.id] = {
+              id: item.id,
+              label: item.label || item.id,
+              schema: item.schema || "",
+              locale: item.locale || "",
+            };
+          } else {
+            delete state.selected[item.id];
+          }
+        });
+        render();
+      });
+      selectHead.appendChild(selectAll);
+      head.appendChild(selectHead);
       head.appendChild(el("th", null, "Content"));
-      head.appendChild(el("th", null, "Locale"));
+      head.appendChild(el("th", null, "Type"));
       head.appendChild(el("th", null, "Updated"));
       table.appendChild(head);
       state.items.forEach(function (item) {
@@ -500,19 +645,19 @@
           } else {
             delete state.selected[item.id];
           }
+          paintSelectionSummary();
         });
         cell.appendChild(box);
         row.appendChild(cell);
         var name = el("td");
         name.appendChild(el("strong", null, item.label || item.id));
-        var schemaText = item.schema || (item.body && item.body._meta && item.body._meta.schema) || "";
-        if (schemaText) name.appendChild(el("span", "schema", schemaText));
         row.appendChild(name);
-        row.appendChild(el("td", null, item.locale || ""));
+        var schemaText = item.schema || (item.body && item.body._meta && item.body._meta.schema) || "";
+        row.appendChild(el("td", null, schemaText ? submission.contentTypeLabel(schemaText) : ""));
         row.appendChild(el("td", null, (item.lastModifiedDate || "").slice(0, 10)));
         table.appendChild(row);
       });
-      content.appendChild(table);
+      finder.appendChild(table);
     }
 
     var pager = el("div", "pager");
@@ -532,40 +677,105 @@
     });
     pager.appendChild(prev);
     pager.appendChild(
-      el(
-        "span",
-        null,
-        state.page.totalElements
-          ? state.page.totalElements + " items"
-          : ""
-      )
+      el("span", null, state.page.totalElements ? state.page.totalElements + " items" : "")
     );
     pager.appendChild(next);
-    content.appendChild(pager);
-
-    content.appendChild(renderSubmitForm());
+    finder.appendChild(pager);
+    workspace.appendChild(finder);
+    workspace.appendChild(renderSubmitForm());
+    content.appendChild(workspace);
   }
 
   function renderSubmitForm() {
     var form = el("form", "submit");
     form.addEventListener("submit", onSubmit);
     form.appendChild(el("h2", null, "Send for translation"));
+    var summary = el("p", "summary", selectionSummaryText());
+    summary.setAttribute("data-selection-summary", "true");
+    form.appendChild(summary);
 
     var locales = el("fieldset");
-    locales.appendChild(el("legend", null, "Target locales"));
-    var grid = el("div", "locales");
-    state.settings.targetLocales.forEach(function (locale) {
-      var label = el("label");
-      var box = el("input");
-      box.type = "checkbox";
-      box.name = "locale";
-      box.value = locale;
-      label.appendChild(box);
-      label.appendChild(document.createTextNode(locale));
-      grid.appendChild(label);
+    locales.appendChild(el("legend", null, "Languages"));
+    var localeSearch = el("input");
+    localeSearch.type = "search";
+    localeSearch.placeholder = "Find a language";
+    localeSearch.value = state.localeFilter || "";
+    localeSearch.addEventListener("input", function () {
+      state.localeFilter = localeSearch.value;
+      paintLocaleChoices();
     });
-    locales.appendChild(grid);
+    locales.appendChild(localeSearch);
+
+    var tools = el("div", "locale-tools");
+    var selectShown = el("button", "text-button", "Select shown");
+    selectShown.type = "button";
+    selectShown.addEventListener("click", function () {
+      submission.filterLocales(state.settings.targetLocales, state.localeFilter).forEach(function (code) {
+        state.chosenLocales[code] = true;
+      });
+      paintLocaleChoices();
+      paintSelectionSummary();
+    });
+    var clearLocales = el("button", "text-button", "Clear");
+    clearLocales.type = "button";
+    clearLocales.addEventListener("click", function () {
+      state.chosenLocales = {};
+      paintLocaleChoices();
+      paintSelectionSummary();
+    });
+    tools.appendChild(selectShown);
+    tools.appendChild(clearLocales);
+    locales.appendChild(tools);
+
+    var chips = el("div", "chips");
+    var list = el("div", "locale-list");
+    locales.appendChild(chips);
+    locales.appendChild(list);
     form.appendChild(locales);
+
+    function paintLocaleChoices() {
+      var selected = chosenLocaleList();
+      chips.textContent = "";
+      if (!selected.length) {
+        chips.appendChild(el("p", "note", "No languages selected."));
+      }
+      selected.forEach(function (code) {
+        var chip = el("button", "chip", submission.localeLabel(code));
+        chip.type = "button";
+        chip.setAttribute("aria-label", "Remove " + submission.localeLabel(code));
+        chip.addEventListener("click", function () {
+          delete state.chosenLocales[code];
+          paintLocaleChoices();
+          paintSelectionSummary();
+        });
+        chips.appendChild(chip);
+      });
+
+      list.textContent = "";
+      var shown = submission.filterLocales(state.settings.targetLocales, state.localeFilter);
+      if (!shown.length) {
+        list.appendChild(el("p", "note", "No languages match."));
+        return;
+      }
+      shown.forEach(function (code) {
+        var label = el("label", "locale-option");
+        var box = el("input");
+        box.type = "checkbox";
+        box.name = "locale";
+        box.value = code;
+        box.checked = Boolean(state.chosenLocales[code]);
+        box.addEventListener("change", function () {
+          if (box.checked) state.chosenLocales[code] = true;
+          else delete state.chosenLocales[code];
+          paintLocaleChoices();
+          paintSelectionSummary();
+        });
+        label.appendChild(box);
+        label.appendChild(document.createTextNode(submission.localeLabel(code)));
+        list.appendChild(label);
+      });
+    }
+    paintLocaleChoices();
 
     var due = el("label", "field");
     due.appendChild(document.createTextNode("Due date"));
@@ -574,35 +784,35 @@
     date.name = "dueDate";
     date.required = true;
     date.min = today();
+    date.value = state.dueDate || "";
+    date.addEventListener("change", function () {
+      state.dueDate = date.value;
+    });
     due.appendChild(date);
     form.appendChild(due);
 
     var review = el("fieldset");
     review.appendChild(el("legend", null, "Human review"));
-    review.appendChild(radio("review", "none", "No human review"));
-    review.appendChild(radio("review", "xtm", "Review in XTM"));
+    var reviewChoice = el("label", "choice");
+    var reviewBox = el("input");
+    reviewBox.type = "checkbox";
+    reviewBox.name = "humanReview";
+    reviewBox.checked = state.humanReview;
+    reviewBox.addEventListener("change", function () {
+      state.humanReview = reviewBox.checked;
+    });
+    reviewChoice.appendChild(reviewBox);
+    reviewChoice.appendChild(document.createTextNode("Request human review"));
+    review.appendChild(reviewChoice);
     form.appendChild(review);
 
-    var button = el("button", "primary", state.busy ? "Submitting…" : "Submit");
+    var button = el("button", "primary", state.submitting ? "Submitting…" : "Submit");
     button.type = "submit";
     button.disabled = state.busy;
     form.appendChild(button);
-    form.appendChild(
-      el("p", "note", "Up to " + submission.MAX_ITEMS + " content items. The Amplience JSON is sent as stored.")
-    );
+    form.appendChild(el("p", "note", "You can send up to " + submission.MAX_ITEMS + " content items at a time."));
+    paintSelectionSummary();
     return form;
-  }
-
-  function radio(name, value, label) {
-    var node = el("label", "choice");
-    var input = el("input");
-    input.type = "radio";
-    input.name = name;
-    input.value = value;
-    input.required = true;
-    node.appendChild(input);
-    node.appendChild(document.createTextNode(label));
-    return node;
   }
 
   function renderRequests(content) {
@@ -634,7 +844,12 @@
         el(
           "p",
           "meta",
-          request.dueDate + " · " + submission.reviewLabel(request.review) + " · " + request.targetLocales.join(", ")
+          request.dueDate +
+            " · " +
+            submission.reviewLabel(request.review) +
+            " · " +
+            request.targetLocales.length +
+            (request.targetLocales.length === 1 ? " language" : " languages")
         )
       );
       if (state.openRequestId === request.id) card.appendChild(renderRequestDetail(request));
@@ -651,7 +866,6 @@
 
   function renderRequestDetail(request) {
     var detail = el("div", "detail");
-    if (request.projectId) detail.appendChild(el("p", null, "Pantheon project " + request.projectId));
     if (request.error) detail.appendChild(el("p", "error-text", request.error));
     (request.warnings || []).forEach(function (warning) {
       detail.appendChild(el("p", "note", warning));
@@ -666,9 +880,11 @@
       list.appendChild(line);
     });
     detail.appendChild(list);
-    detail.appendChild(el("h3", null, "Target locales"));
-    detail.appendChild(el("p", null, request.targetLocales.join(", ")));
-    detail.appendChild(el("h3", null, "Review"));
+    detail.appendChild(el("h3", null, "Languages"));
+    detail.appendChild(
+      el("p", null, request.targetLocales.map(submission.localeLabel).join(", "))
+    );
+    detail.appendChild(el("h3", null, "Human review"));
     detail.appendChild(el("p", null, submission.reviewLabel(request.review)));
     return detail;
   }

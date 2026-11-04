@@ -62,6 +62,63 @@
     error: "failed",
   };
 
+  function localeLabel(code) {
+    var names = {
+      "bg-BG": "Bulgarian",
+      "cs-CZ": "Czech",
+      "da-DK": "Danish",
+      "de-AT": "German (Austria)",
+      "de-CH": "German (Switzerland)",
+      "de-DE": "German (Germany)",
+      "el-GR": "Greek",
+      "en": "English",
+      "en-GB": "English (United Kingdom)",
+      "en-IE": "English (Ireland)",
+      "es-ES": "Spanish",
+      "et-EE": "Estonian",
+      "fi-FI": "Finnish",
+      "fr": "French",
+      "fr-BE": "French (Belgium)",
+      "fr-CH": "French (Switzerland)",
+      "fr-FR": "French (France)",
+      "hr-HR": "Croatian",
+      "hu-HU": "Hungarian",
+      "it-CH": "Italian (Switzerland)",
+      "it-IT": "Italian",
+      "lt-LT": "Lithuanian",
+      "lv-LV": "Latvian",
+      "mt-MT": "Maltese",
+      "nl-BE": "Dutch (Belgium)",
+      "nl-NL": "Dutch",
+      "no-NO": "Norwegian",
+      "pl-PL": "Polish",
+      "pt-PT": "Portuguese",
+      "ro-RO": "Romanian",
+      "sk-SK": "Slovak",
+      "sl-SI": "Slovenian",
+      "sr-RS": "Serbian",
+      "sv-SE": "Swedish",
+    };
+    var name = names[code];
+    return name ? name + " (" + code + ")" : code;
+  }
+
+  function filterLocales(locales, query) {
+    var needle = String(query || "").trim().toLowerCase();
+    var list = Array.isArray(locales) ? locales : [];
+    if (!needle) return list.slice();
+    return list.filter(function (code) {
+      return localeLabel(code).toLowerCase().indexOf(needle) !== -1;
+    });
+  }
+
+  function contentTypeLabel(uri) {
+    var name = String(uri || "").split("?")[0].split("/").pop() || "Content";
+    name = name.replace(/\.json$/i, "").replace(/[-_]+/g, " ");
+    if (!name) return "Content";
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
   function cleanToken(value) {
     return String(value || "").replace(/["\\]/g, "").trim();
   }
@@ -163,7 +220,7 @@
     if (items.length > MAX_ITEMS) errors.push("Select at most " + MAX_ITEMS + " content items.");
     if (!targets.length) errors.push("Select at least one target locale.");
     if (!input || (input.review !== "none" && input.review !== "xtm")) {
-      errors.push("Choose no human review or review in XTM.");
+      errors.push("Choose whether to request human review.");
     }
     if (!input || !input.dueDate) errors.push("Enter a due date.");
     else if (input.dueDate < day) errors.push("Due date cannot be in the past.");
@@ -241,9 +298,9 @@
   }
 
   function reviewLabel(review) {
-    if (review === "xtm") return "Review in XTM";
+    if (review === "xtm") return "Human review requested";
     if (review === "none") return "No human review";
-    return "Not set";
+    return "No human review";
   }
 
   function statusLabel(status) {
@@ -293,5 +350,8 @@
     statusLabel: statusLabel,
     mergeRemoteRequests: mergeRemoteRequests,
     storageKey: storageKey,
+    localeLabel: localeLabel,
+    filterLocales: filterLocales,
+    contentTypeLabel: contentTypeLabel,
   };
 });

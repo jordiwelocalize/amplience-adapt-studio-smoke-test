@@ -6,7 +6,7 @@ This version covers:
 
 - Select content and submit it (PLTFRM-7782)
 - See request status in Amplience (PLTFRM-7783)
-- Choose no human review or review in XTM (PLTFRM-7785)
+- Choose whether to request human review (PLTFRM-7785)
 
 Writing a localized content item back to Amplience, and review in the Opal Editor, are not in this version.
 
@@ -45,7 +45,15 @@ Read permission is required to list and open content items. Modify is not requir
 
 Leave a field out to use the default. Target locales default to the Epson English-to-all list. When `statuses` are empty, the extension matches workflow labels that contain "Ready" and "In progress".
 
-`submissionUrl` is the Welocalize handoff. The extension does not store a Pantheon credential. When the URL is empty, the request is kept in this browser and the detail says that a Pantheon project is created once the URL is set. Source items stay in their current workflow state.
+`submissionUrl` is the Welocalize handoff in `server/`. The extension does not store a Pantheon credential. When the URL is empty, the request is kept in this browser and Welocalize has not received it.
+
+The handoff calls the public Client API: create the project, upload each content item as a work JSON file, then start the project. Copy `.env.example` to `.env` and set `CLIENT_API_TOKEN`. The token is the Client API key for the platform instance that should own the project. When `CLIENT_API_SERVICE_ID` is empty and that token can see one service, that service is used.
+
+```bash
+node server/index.js
+```
+
+The process listens on port 8787. Ash's browser has to reach that process over HTTPS. The Client API base URL defaults to `https://hypnos-client-api.welocalize.io`. On that environment the sandbox token can see service `blackbirdio_test`. A submitted request shows up in `GET /v1/client-api/projects` for the same token. The project reference id is the extension's `clientRequestId`.
 
 ### Handoff contract
 
@@ -74,7 +82,7 @@ Leave a field out to use the default. Target locales default to the Epson Englis
 }
 ```
 
-`review` is `none` or `xtm`. The response is JSON:
+On screen, human review is a single checkbox, "Request human review". The requester does not see Pantheon, XTM, or the Opal Editor. The stored `review` value is still `none` or `xtm` (`xtm` means human review was requested). The response is JSON:
 
 ```json
 { "projectId": "12345", "status": "submitted" }
